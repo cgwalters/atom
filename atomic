@@ -162,6 +162,8 @@ class Atomic(object):
         except:
             pass
 
+        self.bindmounts = getattr(args, 'bindmounts', [])
+
         try:
             self.force = args.force
         except:
@@ -247,6 +249,46 @@ class Atomic(object):
             return labels[label].split()
         return None
 
+    def _try_augment_docker_run(self, argv, extra_argv):
+        """Scan a RUN label and attempt to find the right place to insert
+additional options.
+        """
+        if len(argv) < 2:
+            return False
+        parsing_bind = False
+        target_index = -1
+        for i,v in enumerate(argv):
+            if i == [0] and v != 'docker':
+                return False
+            if i == [1] and v != 'run':
+                return False
+
+            if parsing_bind:
+                parsing_bind = False
+                continue
+
+            if v == '-v':
+                parsing_bind = True
+                target_index = i + 1
+            elif v.startswith('--volume='):
+                target_index = i
+
+        if target_index == -1:
+            if argv[-1] == 'IMAGE':
+                target_index = len(argv)-1
+            else:
+                # We couldn't find a bind mount and the RUN command
+                # doesn't end in IMAGE
+                return False
+
+        for v in reversed(extra_argv):        
+            argv.insert(target_index + 1, v)
+        return True
+
+    def _augment_docker_run(self, argv, extra):
+        if not self._try_augment_docker_run(argv, extra):
+            sys.stderr.write("warning: Unable to parse RUN command to insert extra arguments {0}\n".format(extra))
+
     def _check_latest(self):
         inspect = self._inspect_image()
         if inspect["Id"] != self.inspect["Image"]:
@@ -296,11 +338,16 @@ removes all containers based on an image.
             self.update()
             self.inspect = self._inspect_image()
 
+        extra_dockerrun_argv = []
+        for arg in self.bindmounts:
+            extra_dockerrun_argv += ['-v', arg]
+
         if self.spc:
+            spcbase_argv = self.SPC_ARGS + extra_dockerrun_argv
             if self.command:
-                args = self.SPC_ARGS + self.command
+                args = spcbase_argv + self.command
             else:
-                args = self.SPC_ARGS +  self._get_cmd()
+                args = spcbase_argv + self._get_cmd()
 
             cmd = self.gen_cmd(args)
             self.writeOut(cmd)
@@ -310,6 +357,10 @@ removes all containers based on an image.
             if not args:
                 missing_RUN = True
                 args = self.RUN_ARGS + self._get_cmd()
+            else:
+                args = self._get_args("RUN")
+
+            self._augment_docker_run(args, extra_dockerrun_argv)
 
             cmd = self.gen_cmd(args)
             self.writeOut(cmd)
@@ -542,6 +593,10 @@ if __name__ == '__main__':
                       default=False,
                       action="store_true",
                       help=_("use super privileged container mode: '%s'") % atomic.print_spc() )
+    runp.add_argument("-v", "--volume", dest="bindmounts",
+                      default=[],
+                      action="append",
+                      help=_("Create a bind mount between host and container, HOSTPATH:CONTAINERPATH (like `docker run`)"))
     runp.add_argument("image", help=_("container image"))
     runp.add_argument("command", nargs=argparse.REMAINDER,
                       help=_("command to execute within the container"))
