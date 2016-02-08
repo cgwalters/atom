@@ -21,7 +21,7 @@ class Top(Atomic):
         super(Top, self).__init__()
         self.input_var = None
         self._sort = 'CID'
-        self.AD = docker.Client(**kwargs_from_env())
+        self.AD = docker.AutoVersionClient(**kwargs_from_env())
         self.name_id = {}
         self.optional = None
         self.titles = None

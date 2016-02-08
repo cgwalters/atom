@@ -92,7 +92,7 @@ class Atomic(object):
                 "${IMAGE}"]
 
     def __init__(self):
-        self.d = docker.Client(**kwargs_from_env())
+        self.d = docker.AutoVersionClient(**kwargs_from_env())
         self.name = None
         self.image = None
         self.spc = False
