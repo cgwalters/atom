@@ -407,11 +407,10 @@ class SystemContainers(object):
             os.unlink(sym)
         os.symlink(destination, sym)
 
-        self._systemctl_command("enable", name)
         if upgrade:
             self._systemctl_command("restart", name)
         else:
-            self._systemctl_command("start", name)
+            self._systemctl_command("enable", name)
 
     def _get_system_checkout_path(self):
         if os.environ.get("ATOMIC_OSTREE_CHECKOUT_PATH"):
