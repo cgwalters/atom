@@ -135,11 +135,6 @@ class Install(Atomic):
                 name = img_obj.fq_name
             except RegistryInspectError:
                 name = img_obj.input_name
-            install_data = {}
-            install_data[name] = {'id': img_obj.id,
-                                  'install_date': strftime("%Y-%m-%d %H:%M:%S", gmtime())
-                                  }
-            util.InstallData.write_install_data(install_data)
             return util.check_call(cmd)
 
     @staticmethod
